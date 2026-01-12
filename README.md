@@ -121,7 +121,12 @@ When you complete (`done`):
 
 ## Credits
 
-Inspired by [planning-with-files](https://github.com/OthmanAdi/planning-with-files) and the Manus agent's file-based planning approach.
+Based on [planning-with-files](https://github.com/OthmanAdi/planning-with-files) by OthmanAdi (MIT License).
+Extended with Taskmaster integration and archive system.
+
+## Integrates With
+
+- [Claude Task Master](https://github.com/eyaltoledano/claude-task-master) - AI-powered task management for Claude Code
 
 ## License
 
