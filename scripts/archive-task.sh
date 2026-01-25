@@ -1,5 +1,5 @@
 #!/bin/bash
-# Archive current planning task and optionally update Taskmaster status
+# Archive current planning task
 # Usage: ./archive-task.sh [project-root]
 
 set -e
@@ -17,20 +17,20 @@ NC='\033[0m' # No Color
 
 cd "$PROJECT_ROOT"
 
-CURRENT_DIR=".planning/current"
-ARCHIVE_DIR=".planning/archive"
+ACTIVE_DIR=".sisyphus/active"
+ARCHIVE_DIR=".sisyphus/archive"
 
-# Check if current directory exists
-if [ ! -d "$CURRENT_DIR" ]; then
-    echo -e "${RED}Error: No active planning found at ${CURRENT_DIR}${NC}"
+# Check if active directory exists
+if [ ! -d "$ACTIVE_DIR" ]; then
+    echo -e "${RED}Error: No active planning found at ${ACTIVE_DIR}${NC}"
     exit 1
 fi
 
 # Find active task folder(s)
-TASK_FOLDERS=($(find "$CURRENT_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
+TASK_FOLDERS=($(find "$ACTIVE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null))
 
 if [ ${#TASK_FOLDERS[@]} -eq 0 ]; then
-    echo -e "${RED}Error: No task folder found in ${CURRENT_DIR}${NC}"
+    echo -e "${RED}Error: No task folder found in ${ACTIVE_DIR}${NC}"
     exit 1
 fi
 
@@ -49,26 +49,12 @@ else
     TASK_FOLDER="${TASK_FOLDERS[0]}"
 fi
 
-FOLDER_NAME=$(basename "$TASK_FOLDER")
+TASK_NAME=$(basename "$TASK_FOLDER")
 
-# Read task metadata if available
-TASK_ID=""
-IS_TASK_ID=false
-TASKMASTER_AVAILABLE=false
+echo -e "${BLUE}Archiving task: ${TASK_NAME}${NC}"
 
-if [ -f "${TASK_FOLDER}/.taskinfo" ]; then
-    source "${TASK_FOLDER}/.taskinfo"
-fi
-
-# Re-check Taskmaster availability
-if [ -f ".taskmaster/tasks/tasks.json" ]; then
-    TASKMASTER_AVAILABLE=true
-fi
-
-echo -e "${BLUE}Archiving task: ${FOLDER_NAME}${NC}"
-
-# Create archive folder name
-ARCHIVE_NAME="${DATE}_${FOLDER_NAME}"
+# Create archive folder name: YYYY-MM-DD_{task}
+ARCHIVE_NAME="${DATE}_${TASK_NAME}"
 ARCHIVE_PATH="${ARCHIVE_DIR}/${ARCHIVE_NAME}"
 
 # Check if archive already exists
@@ -92,9 +78,9 @@ if [ -f "${TASK_FOLDER}/progress.md" ]; then
     echo "**Completed:** ${TIMESTAMP}" >> "${TASK_FOLDER}/progress.md"
 fi
 
-# Update .taskinfo with completion time
-if [ -f "${TASK_FOLDER}/.taskinfo" ]; then
-    echo "COMPLETED=${TIMESTAMP}" >> "${TASK_FOLDER}/.taskinfo"
+# Update .meta with completion time
+if [ -f "${TASK_FOLDER}/.meta" ]; then
+    echo "COMPLETED=${TIMESTAMP}" >> "${TASK_FOLDER}/.meta"
 fi
 
 # Move to archive
@@ -102,26 +88,8 @@ mv "$TASK_FOLDER" "$ARCHIVE_PATH"
 
 echo -e "${GREEN}Archived to: ${ARCHIVE_PATH}${NC}"
 
-# Update Taskmaster status if linked
-if [ "$IS_TASK_ID" = true ] && [ -n "$TASK_ID" ] && [ "$TASKMASTER_AVAILABLE" = true ]; then
-    echo ""
-    echo -e "${BLUE}Updating Taskmaster task ${TASK_ID} to done...${NC}"
-
-    if command -v task-master &> /dev/null; then
-        if task-master set-status --id="$TASK_ID" --status=done 2>/dev/null; then
-            echo -e "${GREEN}Taskmaster task ${TASK_ID} marked as done${NC}"
-        else
-            echo -e "${YELLOW}Warning: Could not update Taskmaster status${NC}"
-            echo "You may need to manually run: task-master set-status --id=${TASK_ID} --status=done"
-        fi
-    else
-        echo -e "${YELLOW}task-master CLI not found. Please update status manually:${NC}"
-        echo "  task-master set-status --id=${TASK_ID} --status=done"
-    fi
-fi
-
-# Clean up current directory if empty
-rmdir "$CURRENT_DIR" 2>/dev/null || true
+# Clean up active directory if empty
+rmdir "$ACTIVE_DIR" 2>/dev/null || true
 
 echo ""
 echo -e "${GREEN}Task archived successfully!${NC}"
@@ -129,13 +97,14 @@ echo ""
 echo "Archive location: ${ARCHIVE_PATH}"
 echo ""
 echo "Files archived:"
-ls -la "$ARCHIVE_PATH" 2>/dev/null | grep -E "\.md$|\.taskinfo$" | awk '{print "  - " $NF}'
+ls -la "$ARCHIVE_PATH" 2>/dev/null | grep -E "\.md$|\.meta$" | awk '{print "  - " $NF}'
 echo ""
 
 # Show summary
-if [ -f "${ARCHIVE_PATH}/task_plan.md" ]; then
-    PHASES_COMPLETE=$(grep -c "Status:\*\* complete" "${ARCHIVE_PATH}/task_plan.md" 2>/dev/null || echo "0")
-    PHASES_TOTAL=$(grep -c "### Phase" "${ARCHIVE_PATH}/task_plan.md" 2>/dev/null || echo "0")
+if [ -f "${ARCHIVE_PATH}/tracker.md" ]; then
+    PHASES_COMPLETE=$(grep -c "\[x\]" "${ARCHIVE_PATH}/tracker.md" 2>/dev/null || echo "0")
+    PHASES_TOTAL=$(grep -c "\[ \]" "${ARCHIVE_PATH}/tracker.md" 2>/dev/null || echo "0")
+    PHASES_TOTAL=$((PHASES_COMPLETE + PHASES_TOTAL))
     echo "Phases completed: ${PHASES_COMPLETE}/${PHASES_TOTAL}"
 fi
 

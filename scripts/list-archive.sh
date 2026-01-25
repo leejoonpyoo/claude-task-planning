@@ -4,7 +4,6 @@
 #
 # Examples:
 #   ./list-archive.sh                    # List all archives
-#   ./list-archive.sh . task-16          # Search for task-16
 #   ./list-archive.sh . auth             # Search for "auth"
 
 set -e
@@ -22,7 +21,7 @@ NC='\033[0m' # No Color
 
 cd "$PROJECT_ROOT"
 
-ARCHIVE_DIR=".planning/archive"
+ARCHIVE_DIR=".sisyphus/archive"
 
 # Check if archive directory exists
 if [ ! -d "$ARCHIVE_DIR" ]; then
@@ -52,41 +51,37 @@ if [ ${#ARCHIVES[@]} -eq 0 ]; then
 fi
 
 # Display archives
-printf "%-30s %-15s %-10s %s\n" "ARCHIVE" "TASK ID" "PHASES" "COMPLETED"
-printf "%-30s %-15s %-10s %s\n" "-------" "-------" "------" "---------"
+printf "%-35s %-10s %s\n" "ARCHIVE" "PHASES" "COMPLETED"
+printf "%-35s %-10s %s\n" "-------" "------" "---------"
 
 for ARCHIVE in "${ARCHIVES[@]}"; do
     ARCHIVE_NAME=$(basename "$ARCHIVE")
 
-    # Extract info from .taskinfo if available
-    TASK_ID="-"
+    # Extract completion time from .meta if available
     COMPLETED="-"
-    if [ -f "${ARCHIVE}/.taskinfo" ]; then
-        source "${ARCHIVE}/.taskinfo" 2>/dev/null || true
-        if [ -n "$TASK_ID" ] && [ "$TASK_ID" != "" ]; then
-            TASK_ID_DISPLAY="$TASK_ID"
-        else
-            TASK_ID_DISPLAY="-"
-        fi
+    if [ -f "${ARCHIVE}/.meta" ]; then
+        source "${ARCHIVE}/.meta" 2>/dev/null || true
         if [ -n "$COMPLETED" ] && [ "$COMPLETED" != "" ]; then
             COMPLETED_DISPLAY="$COMPLETED"
         else
             COMPLETED_DISPLAY="-"
         fi
     else
-        TASK_ID_DISPLAY="-"
         COMPLETED_DISPLAY="-"
     fi
 
-    # Count phases
+    # Count phases from tracker.md
     PHASES_INFO="-"
-    if [ -f "${ARCHIVE}/task_plan.md" ]; then
-        PHASES_COMPLETE=$(grep -c "Status:\*\* complete" "${ARCHIVE}/task_plan.md" 2>/dev/null || echo "0")
-        PHASES_TOTAL=$(grep -c "### Phase" "${ARCHIVE}/task_plan.md" 2>/dev/null || echo "0")
-        PHASES_INFO="${PHASES_COMPLETE}/${PHASES_TOTAL}"
+    if [ -f "${ARCHIVE}/tracker.md" ]; then
+        PHASES_COMPLETE=$(grep -c "\[x\]" "${ARCHIVE}/tracker.md" 2>/dev/null || echo "0")
+        PHASES_TOTAL=$(grep -c "\[ \]" "${ARCHIVE}/tracker.md" 2>/dev/null || echo "0")
+        PHASES_TOTAL=$((PHASES_COMPLETE + PHASES_TOTAL))
+        if [ "$PHASES_TOTAL" -gt 0 ]; then
+            PHASES_INFO="${PHASES_COMPLETE}/${PHASES_TOTAL}"
+        fi
     fi
 
-    printf "%-30s %-15s %-10s %s\n" "$ARCHIVE_NAME" "$TASK_ID_DISPLAY" "$PHASES_INFO" "$COMPLETED_DISPLAY"
+    printf "%-35s %-10s %s\n" "$ARCHIVE_NAME" "$PHASES_INFO" "$COMPLETED_DISPLAY"
 done
 
 echo ""
@@ -95,9 +90,9 @@ echo ""
 
 # Show usage hints
 echo "To view an archive:"
-echo "  cat .planning/archive/<archive-name>/task_plan.md"
-echo "  cat .planning/archive/<archive-name>/findings.md"
-echo "  cat .planning/archive/<archive-name>/progress.md"
+echo "  cat .sisyphus/archive/<archive-name>/tracker.md"
+echo "  cat .sisyphus/archive/<archive-name>/findings.md"
+echo "  cat .sisyphus/archive/<archive-name>/progress.md"
 echo ""
 echo "To search archives:"
 echo "  /planning-with-files list <search-term>"

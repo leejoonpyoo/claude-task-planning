@@ -1,7 +1,7 @@
 ---
 name: planning-with-files
-version: "3.0.0"
-description: Implements Manus-style file-based planning for complex tasks. Creates task_plan.md, findings.md, and progress.md. Integrates with Taskmaster for task/phase synchronization. Use when starting complex multi-step tasks, research projects, or any task requiring >5 tool calls.
+version: "4.0.0"
+description: Sisyphus 실행 컨텍스트 관리. Prometheus 전략 계획과 보완하여 작업 중 상태를 추적. 5+ 단계 복잡한 작업에 사용.
 user-invocable: true
 allowed-tools:
   - Read
@@ -16,17 +16,17 @@ hooks:
   SessionStart:
     - hooks:
         - type: command
-          command: "echo '[planning-with-files] Ready. Commands: start [name|id], done, list'"
+          command: "echo '[planning-with-files] Ready. Commands: start <name>, done, list'"
   PreToolUse:
     - matcher: "Write|Edit|Bash"
       hooks:
         - type: command
-          command: "cat .planning/current/*/task_plan.md 2>/dev/null | head -30 || true"
+          command: "cat .sisyphus/active/*/tracker.md 2>/dev/null | head -30 || true"
   PostToolUse:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "echo '[planning-with-files] File updated. If this completes a phase, update task_plan.md status.'"
+          command: "echo '[planning-with-files] File updated. Update tracker.md if phase complete.'"
   Stop:
     - hooks:
         - type: command
@@ -35,101 +35,92 @@ hooks:
 
 # Planning with Files
 
-Work like Manus: Use persistent markdown files as your "working memory on disk."
+Manus 스타일의 "working memory on disk" 구현. Prometheus 전략 계획과 보완하여 실행 중 컨텍스트를 관리.
 
-## Taskmaster Integration
+## Prometheus와의 관계
 
-This skill integrates with Taskmaster for seamless task management:
+| 도구 | 역할 | 산출물 |
+|------|------|--------|
+| **Prometheus** | 전략적 계획 (Why, What) | `.sisyphus/plans/{task}.md` |
+| **planning-with-files** | 실행 컨텍스트 (Where, How) | `.sisyphus/active/{task}/` |
 
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| **Taskmaster Mode** | `start 16` (numeric) | Links to task ID, syncs status |
-| **Standalone Mode** | `start auth-refactor` | Independent planning, no sync |
-| **Auto-detect** | `.taskmaster/` exists? | Enables/disables integration |
+```
+Prometheus = 설계도 (참조용, 상세)
+planning-with-files = 현장 일지 (작업용, 가벼움)
+```
 
 ## Commands
 
 ```bash
-/planning-with-files start [name|id]   # Start new task
-/planning-with-files done              # Complete & archive current task
-/planning-with-files list              # List archived tasks
-```
-
-### Examples
-
-```bash
-# Taskmaster integration (numeric = task ID)
-/planning-with-files start 16
-# → Creates .planning/current/task-16/
-# → Sets Taskmaster task 16 to in-progress
-# → Includes task info in task_plan.md
-
-# Standalone mode (non-numeric)
-/planning-with-files start auth-refactor
-# → Creates .planning/current/auth-refactor/
-# → No Taskmaster interaction
-
-# Complete current task
-/planning-with-files done
-# → Archives to .planning/archive/YYYY-MM-DD_task-16/
-# → Sets Taskmaster task 16 to done (if linked)
-
-# List past work
-/planning-with-files list
-# → Shows all archived tasks
+/planning-with-files start <name>   # 실행 컨텍스트 생성
+/planning-with-files done           # 완료 및 아카이브
+/planning-with-files list           # 아카이브 목록
 ```
 
 ## Folder Structure
 
 ```
-.planning/
-├── current/                    # Active work (one task at a time recommended)
-│   └── task-16/               # or: auth-refactor/
-│       ├── task_plan.md       # Phases, progress, decisions
-│       ├── findings.md        # Research, discoveries
-│       └── progress.md        # Session log
-└── archive/                   # Completed work
-    ├── 2026-01-10_task-15/
-    └── 2026-01-08_api-design/
+.sisyphus/
+├── plans/                    # Prometheus 전략 계획 (READ 참조)
+│   └── {task}.md            # 상세하고 변경 적음
+│
+├── drafts/                   # Prometheus 초안
+│   └── {task}.md
+│
+├── active/                   # 현재 실행 중 (planning-with-files)
+│   └── {task}/
+│       ├── tracker.md       # 가벼운 상태 추적
+│       ├── findings.md      # 연구/발견
+│       └── progress.md      # 세션 로그
+│
+└── archive/                  # 완료된 작업
+    └── YYYY-MM-DD_{task}/
 ```
 
 ## File Purposes
 
 | File | Purpose | When to Update |
 |------|---------|----------------|
-| `task_plan.md` | Phases, progress, decisions | After each phase |
-| `findings.md` | Research, discoveries | After ANY discovery |
-| `progress.md` | Session log, test results | Throughout session |
+| `tracker.md` | Phase 상태, 간단한 결정 | Phase 완료 시 |
+| `findings.md` | 연구, 발견, 기술 노트 | 발견 즉시 (2-Action Rule) |
+| `progress.md` | 세션 로그, 테스트 결과, 에러 | 지속적으로 |
 
-## Workflow with Taskmaster
+## Workflow
+
+### With Prometheus (Recommended)
 
 ```
-1. task-master next
-   → "Task 16 available"
+1. /prometheus auth-system
+   → 인터뷰 진행
+   → .sisyphus/plans/auth-system.md 생성 (상세 계획)
 
-2. /planning-with-files start 16
-   → Creates .planning/current/task-16/
-   → Taskmaster: task 16 → in-progress
-   → task_plan.md includes task info
+2. /planning-with-files start auth-system
+   → .sisyphus/plans/auth-system.md 감지
+   → .sisyphus/active/auth-system/ 생성
+   → tracker.md에 plan 참조 링크 포함
+   → findings.md, progress.md 생성
 
 3. Work on task...
-   → Update findings.md, progress.md
+   → 2개 작업마다 findings.md 업데이트
+   → phase 완료 시 tracker.md 업데이트
+   → 에러 발생 시 progress.md에 기록
 
 4. /planning-with-files done
-   → Archives to .planning/archive/2026-01-12_task-16/
-   → Taskmaster: task 16 → done
+   → .sisyphus/archive/2026-01-25_auth-system/ 이동
+   → plans/auth-system.md는 유지 (레퍼런스)
 ```
 
-## Standalone Workflow
+### Standalone (Without Prometheus)
 
 ```
-1. /planning-with-files start refactor-auth
-   → Creates .planning/current/refactor-auth/
+1. /planning-with-files start quick-fix
+   → .sisyphus/active/quick-fix/ 생성
+   → tracker.md (기본 템플릿), findings.md, progress.md 생성
 
 2. Work on task...
 
 3. /planning-with-files done
-   → Archives to .planning/archive/2026-01-12_refactor-auth/
+   → 아카이브
 ```
 
 ## The Core Pattern
@@ -143,40 +134,33 @@ Filesystem = Disk (persistent, unlimited)
 
 ## Critical Rules
 
-### 1. Create Plan First
-Never start a complex task without `task_plan.md`. Non-negotiable.
+### 1. The 2-Action Rule
+> "After every 2 view/browser/search operations, IMMEDIATELY save key findings to findings.md."
 
-### 2. The 2-Action Rule
-> "After every 2 view/browser/search operations, IMMEDIATELY save key findings to text files."
+### 2. Read Before Decide
+Before major decisions, read tracker.md and findings.md. This keeps goals in your attention window.
 
-This prevents visual/multimodal information from being lost.
-
-### 3. Read Before Decide
-Before major decisions, read the plan file. This keeps goals in your attention window.
-
-### 4. Update After Act
+### 3. Update After Act
 After completing any phase:
-- Mark phase status: `in_progress` → `complete`
-- Log any errors encountered
+- Mark phase status in tracker.md: `in_progress` → `complete`
+- Log actions in progress.md
 - Note files created/modified
 
-### 5. Log ALL Errors
-Every error goes in the plan file. This builds knowledge and prevents repetition.
+### 4. Log ALL Errors
+Every error goes in progress.md. This prevents repetition.
 
 ```markdown
-## Errors Encountered
-| Error | Attempt | Resolution |
-|-------|---------|------------|
-| FileNotFoundError | 1 | Created default config |
-| API timeout | 2 | Added retry logic |
+## Errors
+| Timestamp | Error | Resolution |
+|-----------|-------|------------|
+| 14:30 | FileNotFoundError | Created default config |
 ```
 
-### 6. Never Repeat Failures
+### 5. Never Repeat Failures
 ```
 if action_failed:
     next_action != same_action
 ```
-Track what you tried. Mutate the approach.
 
 ## The 3-Strike Error Protocol
 
@@ -188,51 +172,33 @@ ATTEMPT 1: Diagnose & Fix
 
 ATTEMPT 2: Alternative Approach
   → Same error? Try different method
-  → Different tool? Different library?
   → NEVER repeat exact same failing action
 
 ATTEMPT 3: Broader Rethink
   → Question assumptions
   → Search for solutions
-  → Consider updating the plan
+  → Update the plan
 
 AFTER 3 FAILURES: Escalate to User
-  → Explain what you tried
-  → Share the specific error
-  → Ask for guidance
 ```
-
-## Read vs Write Decision Matrix
-
-| Situation | Action | Reason |
-|-----------|--------|--------|
-| Just wrote a file | DON'T read | Content still in context |
-| Viewed image/PDF | Write findings NOW | Multimodal → text before lost |
-| Browser returned data | Write to file | Screenshots don't persist |
-| Starting new phase | Read plan/findings | Re-orient if context stale |
-| Error occurred | Read relevant file | Need current state to fix |
-| Resuming after gap | Read all planning files | Recover state |
 
 ## The 5-Question Reboot Test
 
-If you can answer these, your context management is solid:
-
 | Question | Answer Source |
 |----------|---------------|
-| Where am I? | Current phase in task_plan.md |
+| Where am I? | Current phase in tracker.md |
 | Where am I going? | Remaining phases |
-| What's the goal? | Goal statement in plan |
+| What's the goal? | plans/{task}.md or tracker.md |
 | What have I learned? | findings.md |
 | What have I done? | progress.md |
 
-## When to Use This Pattern
+## When to Use
 
 **Use for:**
-- Multi-step tasks (3+ steps)
-- Research tasks
-- Building/creating projects
+- Multi-step tasks (5+ steps)
+- Research-heavy work
 - Tasks spanning many tool calls
-- Anything requiring organization
+- After `/prometheus` planning
 
 **Skip for:**
 - Simple questions
@@ -241,9 +207,9 @@ If you can answer these, your context management is solid:
 
 ## Templates
 
-Templates are in `${CLAUDE_PLUGIN_ROOT}/templates/`:
+Templates in `${CLAUDE_PLUGIN_ROOT}/templates/`:
 
-- [templates/task_plan.md](templates/task_plan.md) — Phase tracking
+- [templates/tracker.md](templates/tracker.md) — Phase tracking (lightweight)
 - [templates/findings.md](templates/findings.md) — Research storage
 - [templates/progress.md](templates/progress.md) — Session logging
 
@@ -265,10 +231,9 @@ Helper scripts in `${CLAUDE_PLUGIN_ROOT}/scripts/`:
 
 | Don't | Do Instead |
 |-------|------------|
-| Use TodoWrite for persistence | Create task_plan.md file |
+| Use TodoWrite for persistence | Create tracker.md file |
 | State goals once and forget | Re-read plan before decisions |
-| Hide errors and retry silently | Log errors to plan file |
-| Stuff everything in context | Store large content in files |
-| Start executing immediately | Create plan file FIRST |
+| Hide errors and retry silently | Log errors to progress.md |
+| Start executing immediately | Create context files FIRST |
 | Repeat failed actions | Track attempts, mutate approach |
-| Manually sync Taskmaster status | Use start/done commands |
+| Duplicate Prometheus plan | Reference it in tracker.md |
