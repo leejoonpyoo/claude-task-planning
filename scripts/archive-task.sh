@@ -80,7 +80,7 @@ fi
 
 # Update .meta with completion time
 if [ -f "${TASK_FOLDER}/.meta" ]; then
-    echo "COMPLETED=${TIMESTAMP}" >> "${TASK_FOLDER}/.meta"
+    echo "COMPLETED=\"${TIMESTAMP}\"" >> "${TASK_FOLDER}/.meta"
 fi
 
 # Move to archive
@@ -102,10 +102,12 @@ echo ""
 
 # Show summary
 if [ -f "${ARCHIVE_PATH}/tracker.md" ]; then
-    PHASES_COMPLETE=$(grep -c "\[x\]" "${ARCHIVE_PATH}/tracker.md" 2>/dev/null || echo "0")
-    PHASES_TOTAL=$(grep -c "\[ \]" "${ARCHIVE_PATH}/tracker.md" 2>/dev/null || echo "0")
-    PHASES_TOTAL=$((PHASES_COMPLETE + PHASES_TOTAL))
-    echo "Phases completed: ${PHASES_COMPLETE}/${PHASES_TOTAL}"
+    PHASES_COMPLETE=$(grep -c "\[x\]" "${ARCHIVE_PATH}/tracker.md" 2>/dev/null) || PHASES_COMPLETE=0
+    PHASES_INCOMPLETE=$(grep -c "\[ \]" "${ARCHIVE_PATH}/tracker.md" 2>/dev/null) || PHASES_INCOMPLETE=0
+    PHASES_TOTAL=$((PHASES_COMPLETE + PHASES_INCOMPLETE))
+    if [ "$PHASES_TOTAL" -gt 0 ]; then
+        echo "Phases completed: ${PHASES_COMPLETE}/${PHASES_TOTAL}"
+    fi
 fi
 
 echo ""

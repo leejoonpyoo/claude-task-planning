@@ -73,9 +73,9 @@ for ARCHIVE in "${ARCHIVES[@]}"; do
     # Count phases from tracker.md
     PHASES_INFO="-"
     if [ -f "${ARCHIVE}/tracker.md" ]; then
-        PHASES_COMPLETE=$(grep -c "\[x\]" "${ARCHIVE}/tracker.md" 2>/dev/null || echo "0")
-        PHASES_TOTAL=$(grep -c "\[ \]" "${ARCHIVE}/tracker.md" 2>/dev/null || echo "0")
-        PHASES_TOTAL=$((PHASES_COMPLETE + PHASES_TOTAL))
+        PHASES_COMPLETE=$(grep -c "\[x\]" "${ARCHIVE}/tracker.md" 2>/dev/null) || PHASES_COMPLETE=0
+        PHASES_INCOMPLETE=$(grep -c "\[ \]" "${ARCHIVE}/tracker.md" 2>/dev/null) || PHASES_INCOMPLETE=0
+        PHASES_TOTAL=$((PHASES_COMPLETE + PHASES_INCOMPLETE))
         if [ "$PHASES_TOTAL" -gt 0 ]; then
             PHASES_INFO="${PHASES_COMPLETE}/${PHASES_TOTAL}"
         fi
